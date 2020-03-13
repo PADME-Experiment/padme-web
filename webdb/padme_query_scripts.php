@@ -1,0 +1,5 @@
+<?php
+define("MCDB_CONNECT_SCRIPT","padme_connect_mcdb.php");
+define("DAQDB_CONNECT_SCRIPT","padme_connect_daqdb.php");
+define("RUN_SCRIPT","padme_query_run.php");
+?>
