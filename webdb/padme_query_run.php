@@ -24,10 +24,10 @@ if (isset($_GET['type'])) {
 }
 
 // Get status
-if (isset($_GET['status'])) {
-    $qstatus = htmlspecialchars($_GET['status']);
+if (isset($_GET['physics'])) {
+    $qphysics = htmlspecialchars($_GET['physics']);
 } else {
-    $qstatus = "ALL";
+    $qphysics = "ALL";
 }
 
 echo "<form name=DBQueryTool action=\"",RUN_SCRIPT,"\" method=GET>\n";
@@ -71,23 +71,15 @@ while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
 }
 echo "\t\t</select>\n";
 
-# Select status
-echo "\t\t<label>Status: </label>\n";
-echo "\t\t<select name=status>\n";
-if ( $qstatus == "ALL" ) {
+# Select physics status
+echo "\t\t<label>Physics: </label>\n";
+echo "\t\t<select name=physics>\n";
+if ( $qphysics == "ALL" ) {
     echo "\t\t\t<option value=ALL selected=selected>ALL</option>\n";
+    echo "\t\t\t<option value=GOOD>GOOD</option>\n";
 } else {
     echo "\t\t\t<option value=ALL>ALL</option>\n";
-}
-$query = "SELECT status FROM run_status";
-$result = mysql_query($query) or die('Query failed: ' . mysql_error());
-while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
-    $status = $line["status"];
-    if ( $status == $qstatus ) {
-        echo "\t\t\t<option value=",$status," selected=selected>",$status,"</option>\n";
-    } else {
-        echo "\t\t\t<option value=",$status,">",$status,"</option>\n";
-    }
+    echo "\t\t\t<option value=GOOD selected=selected>GOOD</option>\n";
 }
 echo "\t\t</select>\n";
 
@@ -96,7 +88,7 @@ echo "\t</fieldset>";
 echo "</form>\n";
 
 if ( $qname == "" ) {
-    show_all_runs($qyear,$qtype,$qstatus);
+    show_all_runs($qyear,$qtype,$qphysics);
 } else {
     show_run($qname);
 }
@@ -106,7 +98,7 @@ if ( $qname == "" ) {
 </HTML>
 
 <?php
-function show_all_runs($year,$type,$status) {
+function show_all_runs($year,$type,$phys) {
 
     echo "<h2>PADME DAQ Runs for year $year</h2>\n";
 
@@ -119,9 +111,6 @@ function show_all_runs($year,$type,$status) {
     if ( $type != "ALL" ) {
         $clause_list[] = "rt.type = \"$type\"";
     }
-    if ( $status != "ALL" ) {
-        $clause_list[] = "rs.status = \"$status\"";
-    }
     $where_clause = "";
     for ($c=0; $c<sizeof($clause_list); $c++) {
         if ($c == 0) {
@@ -130,19 +119,26 @@ function show_all_runs($year,$type,$status) {
             $where_clause .= " AND ".$clause_list[$c];
         }
     }
-    #echo "<pre>$where_clause</pre>\n";
+
+    // Get list of run statuses
+    $status = array();
+    $query = "SELECT id,status FROM run_status";
+    $result = mysql_query($query) or die('Query failed: ' . mysql_error());
+    while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
+        $status[$line["id"]] = $line["status"];
+    }
+    mysql_free_result($result);
 
     // Get list of existing Runs
     $query = "
 SELECT r.name         AS name,
        rt.type        AS type,
-       rs.status      AS status,
+       r.status       AS status,
        r.time_create  AS time_create,
        r.time_stop    AS time_stop,
        r.total_events AS total_events
 FROM         run        r
   INNER JOIN run_type   rt ON r.run_type_id=rt.id
-  INNER JOIN run_status rs ON r.status=rs.id
 $where_clause
 ORDER BY r.time_create
 ";
@@ -150,22 +146,34 @@ ORDER BY r.time_create
 
     // Printing results in HTML
     echo "<table cellpadding=3>\n";
-    echo "\t<tr><th>Run name</th><th>Type</th><th>Status</th><th>Events</th><th>Created</th><th>Ended</th></tr>\n";
+    echo "\t<tr><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th></tr>\n";
     while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
         $name = $line["name"];
-        $status = $line["status"];
+        $runstat = ((int)$line["status"]) % 100;
+        $physics = floor(((int)$line["status"])/100);
         $type = $line["type"];
         $time_create = $line["time_create"];
         $time_stop = $line["time_stop"];
         $total_events = $line["total_events"];
-        echo "\t<tr>\n";
-        echo "\t\t<td><a href=\"",RUN_SCRIPT,"?name=$name\">$name</a></td>\n";
-        echo "\t\t<td align=center>$type</a></td>\n";
-        echo "\t\t<td align=center>$status</a></td>\n";
-        echo "\t\t<td align=right>$total_events</a></td>\n";
-        echo "\t\t<td>$time_create</a></td>\n";
-        echo "\t\t<td>$time_stop</a></td>\n";
-        echo "\t</tr>\n";
+        if ($phys == "ALL" || ($phys == "GOOD" && $physics == 1)) {
+            echo "\t<tr>\n";
+            echo "\t\t<td><a href=\"",RUN_SCRIPT,"?name=$name\">$name</a></td>\n";
+            echo "\t\t<td align=center>$type</a></td>\n";
+            echo "\t\t<td align=center>$status[$runstat]</a></td>\n";
+            if ($physics == 1) {
+                echo "\t\t<td align=center>GOOD</a></td>\n";
+            } else {
+                echo "\t\t<td align=center>-</a></td>\n";
+            }
+            if ($total_events) {
+                echo "\t\t<td align=right>$total_events</a></td>\n";
+            } else {
+                echo "\t\t<td align=right>-</a></td>\n";
+            }
+            echo "\t\t<td>$time_create</a></td>\n";
+            echo "\t\t<td>$time_stop</a></td>\n";
+            echo "\t</tr>\n";
+        }
     }
     echo "</table>\n";
 
@@ -235,6 +243,7 @@ WHERE r.name=\"$run_name\"
     echo "<br>\n";
 
     // Show log messages associated to this run
+    $elog_msgs = array();
     $query = "SELECT type,level,time,text FROM log_entry WHERE run_number=$run_number";
     //echo "$query\n";
     $result = mysql_query($query) or die('Query failed: ' . mysql_error());
@@ -245,15 +254,27 @@ WHERE r.name=\"$run_name\"
         $log_level = $line["level"];
         $log_time = $line["time"];
         $log_text = $line["text"];
-        echo "\t<tr>\n";
-        echo "\t\t<td>$log_time</td>\n";
-        echo "\t\t<td>$log_type</td>\n";
-        echo "\t\t<td align=center>$log_level</td>\n";
-        echo "\t\t<td>$log_text</td>\n";
-        echo "\t</tr>\n";
+        # Check if this is a link to an eLogBook message
+        if ($log_type == "ELOG" and preg_match("/\d+/",$log_text)) {
+            $elog_msgs[] = $log_text;
+        } else {
+            $log_text = preg_replace("/ELOG (\d+)/","<A HREF=\"".ELOGBOOK_HREF."\${1}\">ELOG \${1}</A>",$log_text);
+            echo "\t<tr>\n";
+            echo "\t\t<td>$log_time</td>\n";
+            echo "\t\t<td>$log_type</td>\n";
+            echo "\t\t<td align=center>$log_level</td>\n";
+            echo "\t\t<td>$log_text</td>\n";
+            echo "\t</tr>\n";
+        }
     }
     echo "</table>\n";
     mysql_free_result($result);
 
+    # Show links to elogbook messages
+    for ($c=0; $c<sizeof($elog_msgs); $c++) {
+        if ($c == 0) echo "Related eLogBook messages:";
+        echo " <A HREF=\"",ELOGBOOK_HREF,$elog_msgs[$c],"\">",$elog_msgs[$c],"</A>";
+    }
+    echo "\n";
 }
 ?>
