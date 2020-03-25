@@ -1,12 +1,9 @@
 <?php
+# Show main header and define standard scripts and tools
 require 'padme_query_header.php';
-require DAQDB_CONNECT_SCRIPT;
 
-if ($mysqli) {
-    echo "mysqli OK\n";
-} else {
-    echo "mysqli ERROR\n";
-}
+# Connect to the online DB
+require DAQDB_CONNECT_SCRIPT;
 
 // Get run name
 if (isset($_GET['name'])) {
