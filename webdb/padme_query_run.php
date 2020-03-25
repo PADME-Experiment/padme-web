@@ -2,6 +2,12 @@
 require 'padme_query_header.php';
 require DAQDB_CONNECT_SCRIPT;
 
+if ($mysqli) {
+    echo "mysqli OK\n";
+} else {
+    echo "mysqli ERROR\n";
+}
+
 // Get run name
 if (isset($_GET['name'])) {
     $qname = htmlspecialchars($_GET['name']);
@@ -60,8 +66,8 @@ if ( $qtype == "ALL" ) {
     echo "\t\t\t<option value=ALL>ALL</option>\n";
 }
 $query = "SELECT type FROM run_type";
-$result = mysql_query($query) or die('Query failed: ' . mysql_error());
-while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
+$result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
+while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
     $type = $line["type"];
     if ( $type == $qtype ) {
         echo "\t\t\t<option value=",$type," selected=selected>",$type,"</option>\n";
@@ -69,6 +75,7 @@ while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
         echo "\t\t\t<option value=",$type,">",$type,"</option>\n";
     }
 }
+mysqli_free_result($result);
 echo "\t\t</select>\n";
 
 # Select physics status
@@ -92,6 +99,9 @@ if ( $qname == "" ) {
 } else {
     show_run($qname);
 }
+
+# Close DB connection before exiting
+mysqli_close($mysqli);
 ?>
 
 </BODY>
@@ -99,6 +109,9 @@ if ( $qname == "" ) {
 
 <?php
 function show_all_runs($year,$type,$phys) {
+
+    # Import DB handle
+    global $mysqli;
 
     echo "<h2>PADME DAQ Runs for year $year</h2>\n";
 
@@ -123,11 +136,11 @@ function show_all_runs($year,$type,$phys) {
     // Get list of run statuses
     $status = array();
     $query = "SELECT id,status FROM run_status";
-    $result = mysql_query($query) or die('Query failed: ' . mysql_error());
-    while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
+    $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
+    while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
         $status[$line["id"]] = $line["status"];
     }
-    mysql_free_result($result);
+    mysqli_free_result($result);
 
     // Get list of existing Runs
     $query = "
@@ -142,12 +155,12 @@ FROM         run        r
 $where_clause
 ORDER BY r.time_create
 ";
-    $result = mysql_query($query) or die('Query failed: ' . mysql_error());
+    $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
 
     // Printing results in HTML
     echo "<table cellpadding=3>\n";
     echo "\t<tr><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th></tr>\n";
-    while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
+    while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
         $name = $line["name"];
         $runstat = ((int)$line["status"]) % 100;
         $physics = floor(((int)$line["status"])/100);
@@ -178,13 +191,16 @@ ORDER BY r.time_create
     echo "</table>\n";
 
     // Free resultset
-    mysql_free_result($result);
+    mysqli_free_result($result);
 
 }
 ?>
 
 <?php
 function show_run($run_name) {
+
+    # Import DB handle
+    global $mysqli;
 
     // **************** Run page ******************* //
 
@@ -216,9 +232,9 @@ FROM         run        r
 WHERE r.name=\"$run_name\"
 ";
     //echo "$query\n";
-    $result = mysql_query($query) or die('Query failed: ' . mysql_error());
-    $line = mysql_fetch_array($result, MYSQL_ASSOC);
-    mysql_free_result($result);
+    $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
+    $line = mysqli_fetch_array($result,MYSQLI_ASSOC);
+    mysqli_free_result($result);
     $run_type = $line["type"];
     $run_status = $line["status"];
     $user = $line["user"];
@@ -246,10 +262,10 @@ WHERE r.name=\"$run_name\"
     $elog_msgs = array();
     $query = "SELECT type,level,time,text FROM log_entry WHERE run_number=$run_number";
     //echo "$query\n";
-    $result = mysql_query($query) or die('Query failed: ' . mysql_error());
+    $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
     echo "<table cellpadding=3>\n";
     echo "\t<tr><th>Log time</th><th>Type</th><th>Level</th><th>Message</th></tr>\n";
-    while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
+    while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
         $log_type = $line["type"];
         $log_level = $line["level"];
         $log_time = $line["time"];
@@ -268,7 +284,7 @@ WHERE r.name=\"$run_name\"
         }
     }
     echo "</table>\n";
-    mysql_free_result($result);
+    mysqli_free_result($result);
 
     # Show links to elogbook messages
     for ($c=0; $c<sizeof($elog_msgs); $c++) {
