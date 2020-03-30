@@ -5,6 +5,8 @@ require 'padme_query_header.php';
 # Connect to the online DB
 require DAQDB_CONNECT_SCRIPT;
 
+$month = array("1"=>"Jan","2"=>"Feb","3"=>"Mar","4"=>"Apr","5"=>"May","6"=>"Jun","7"=>"Jul","8"=>"Aug","9"=>"Sep","10"=>"Oct","11"=>"Nov","12"=>"Dec");
+
 // Get run name
 if (isset($_GET['name'])) {
     $qname = htmlspecialchars($_GET['name']);
@@ -17,6 +19,34 @@ if (isset($_GET['year'])) {
     $qyear = htmlspecialchars($_GET['year']);
 } else {
     $qyear = date("Y");
+}
+
+// Get start month
+if (isset($_GET['start_month'])) {
+    $qstart_month = htmlspecialchars($_GET['start_month']);
+} else {
+    $qstart_month = "1";
+}
+
+// Get start day
+if (isset($_GET['start_day'])) {
+    $qstart_day = htmlspecialchars($_GET['start_day']);
+} else {
+    $qstart_day = "1";
+}
+
+// Get end month
+if (isset($_GET['end_month'])) {
+    $qend_month = htmlspecialchars($_GET['end_month']);
+} else {
+    $qend_month = "12";
+}
+
+// Get end day
+if (isset($_GET['end_day'])) {
+    $qend_day = htmlspecialchars($_GET['end_day']);
+} else {
+    $qend_day = "31";
 }
 
 // Get type
@@ -50,6 +80,54 @@ for ($y=2018;$y<=(int)date("Y");$y++) {
         echo "\t\t\t<option value=",$y," selected=selected>",$y,"</option>\n";
     } else {
         echo "\t\t\t<option value=",$y,">",$y,"</option>\n";
+    }
+}
+echo "\t\t</select>\n";
+
+echo "\t\t<label>From: </label>\n";
+
+# Select initial month
+echo "\t\t<select name=start_month>\n";
+for ($m=1;$m<=12;$m++) {
+    if ( $m == (int)$qstart_month ) {
+        echo "\t\t\t<option value=",$m," selected=selected>",$month[$m],"</option>\n";
+    } else {
+        echo "\t\t\t<option value=",$m,">",$month[$m],"</option>\n";
+    }
+}
+echo "\t\t</select>\n";
+
+# Select initial day
+echo "\t\t<select name=start_day>\n";
+for ($d=1;$d<=31;$d++) {
+    if ( $d == (int)$qstart_day ) {
+        echo "\t\t\t<option value=",$d," selected=selected>",$d,"</option>\n";
+    } else {
+        echo "\t\t\t<option value=",$d,">",$d,"</option>\n";
+    }
+}
+echo "\t\t</select>\n";
+
+echo "\t\t<label>To: </label>\n";
+
+# Select final month
+echo "\t\t<select name=end_month>\n";
+for ($m=1;$m<=12;$m++) {
+    if ( $m == (int)$qend_month ) {
+        echo "\t\t\t<option value=",$m," selected=selected>",$month[$m],"</option>\n";
+    } else {
+        echo "\t\t\t<option value=",$m,">",$month[$m],"</option>\n";
+    }
+}
+echo "\t\t</select>\n";
+
+# Select final day
+echo "\t\t<select name=end_day>\n";
+for ($d=1;$d<=31;$d++) {
+    if ( $d == (int)$qend_day ) {
+        echo "\t\t\t<option value=",$d," selected=selected>",$d,"</option>\n";
+    } else {
+        echo "\t\t\t<option value=",$d,">",$d,"</option>\n";
     }
 }
 echo "\t\t</select>\n";
@@ -92,7 +170,13 @@ echo "\t</fieldset>";
 echo "</form>\n";
 
 if ( $qname == "" ) {
-    show_all_runs($qyear,$qtype,$qphysics);
+    if ( $qyear == "ALL" ) {
+        show_all_runs("ALL","ALL",$qtype,$qphysics);
+    } else {
+        $time_start = sprintf("%4.4d-%02d-%02d 00:00:00",$qyear,$qstart_month,$qstart_day);
+        $time_end = sprintf("%4.4d-%02d-%02d 23:59:59",$qyear,$qend_month,$qend_day);
+        show_all_runs($time_start,$time_end,$qtype,$qphysics);
+    }
 } else {
     show_run($qname);
 }
@@ -105,18 +189,20 @@ mysqli_close($mysqli);
 </HTML>
 
 <?php
-function show_all_runs($year,$type,$phys) {
+    function show_all_runs($time_start,$time_end,$type,$phys) {
 
     # Import DB handle
     global $mysqli;
 
-    echo "<h2>PADME DAQ Runs for year $year</h2>\n";
+    if ( $time_start == "ALL" ) {
+        echo "<h2>PADME DAQ Runs</h2>\n";
+    } else {
+        echo "<h2>PADME DAQ Runs for period from ".substr($time_start,0,10)." to ".substr($time_end,0,10)."</h2>\n";
+    }
 
     $clause_list = array();
-    if ( $year != "ALL" ) {
-        $year_start = "$year-01-01 00:00:00";
-        $year_end = "$year-12-31 23:59:59";
-        $clause_list[] = "r.time_create >= \"$year_start\" AND r.time_create <= \"$year_end\"";
+    if ( $time_start != "ALL" ) {
+        $clause_list[] = "r.time_create >= \"$time_start\" AND r.time_create <= \"$time_end\"";
     }
     if ( $type != "ALL" ) {
         $clause_list[] = "rt.type = \"$type\"";
@@ -154,38 +240,42 @@ ORDER BY r.time_create
 ";
     $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
 
-    // Printing results in HTML
-    echo "<table cellpadding=3>\n";
-    echo "\t<tr><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th></tr>\n";
-    while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
-        $name = $line["name"];
-        $runstat = ((int)$line["status"]) % 100;
-        $physics = floor(((int)$line["status"])/100);
-        $type = $line["type"];
-        $time_create = $line["time_create"];
-        $time_stop = $line["time_stop"];
-        $total_events = $line["total_events"];
-        if ($phys == "ALL" || ($phys == "GOOD" && $physics == 1)) {
-            echo "\t<tr>\n";
-            echo "\t\t<td><a href=\"",RUN_SCRIPT,"?name=$name\">$name</a></td>\n";
-            echo "\t\t<td align=center>$type</a></td>\n";
-            echo "\t\t<td align=center>$status[$runstat]</a></td>\n";
-            if ($physics == 1) {
-                echo "\t\t<td align=center>GOOD</a></td>\n";
-            } else {
-                echo "\t\t<td align=center>-</a></td>\n";
+    if (mysqli_num_rows($result)==0) {
+        echo "<h2>No run was started in the selected period</h2>\n";
+    } else {
+        // Printing results in HTML
+        echo "<table cellpadding=3>\n";
+        echo "\t<tr><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th></tr>\n";
+        while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
+            $name = $line["name"];
+            $runstat = ((int)$line["status"]) % 100;
+            $physics = floor(((int)$line["status"])/100);
+            $type = $line["type"];
+            $time_create = $line["time_create"];
+            $time_stop = $line["time_stop"];
+            $total_events = $line["total_events"];
+            if ($phys == "ALL" || ($phys == "GOOD" && $physics == 1)) {
+                echo "\t<tr>\n";
+                echo "\t\t<td><a href=\"",RUN_SCRIPT,"?name=$name\">$name</a></td>\n";
+                echo "\t\t<td align=center>$type</a></td>\n";
+                echo "\t\t<td align=center>$status[$runstat]</a></td>\n";
+                if ($physics == 1) {
+                    echo "\t\t<td align=center>GOOD</a></td>\n";
+                } else {
+                    echo "\t\t<td align=center>-</a></td>\n";
+                }
+                if (is_null($total_events)) {
+                    echo "\t\t<td align=right>-</a></td>\n";
+                } else {
+                    echo "\t\t<td align=right>$total_events</a></td>\n";
+                }
+                echo "\t\t<td>$time_create</a></td>\n";
+                echo "\t\t<td>$time_stop</a></td>\n";
+                echo "\t</tr>\n";
             }
-            if (is_null($total_events)) {
-                echo "\t\t<td align=right>-</a></td>\n";
-            } else {
-                echo "\t\t<td align=right>$total_events</a></td>\n";
-            }
-            echo "\t\t<td>$time_create</a></td>\n";
-            echo "\t\t<td>$time_stop</a></td>\n";
-            echo "\t</tr>\n";
         }
+        echo "</table>\n";
     }
-    echo "</table>\n";
 
     // Free resultset
     mysqli_free_result($result);
