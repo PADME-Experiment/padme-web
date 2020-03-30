@@ -175,10 +175,10 @@ ORDER BY r.time_create
             } else {
                 echo "\t\t<td align=center>-</a></td>\n";
             }
-            if ($total_events) {
-                echo "\t\t<td align=right>$total_events</a></td>\n";
-            } else {
+            if (is_null($total_events)) {
                 echo "\t\t<td align=right>-</a></td>\n";
+            } else {
+                echo "\t\t<td align=right>$total_events</a></td>\n";
             }
             echo "\t\t<td>$time_create</a></td>\n";
             echo "\t\t<td>$time_stop</a></td>\n";
