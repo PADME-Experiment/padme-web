@@ -9,6 +9,30 @@ $month = array("1"=>"Jan","2"=>"Feb","3"=>"Mar","4"=>"Apr","5"=>"May","6"=>"Jun"
 
 $job_status_name = array("0"=>"Created","1"=>"Active","2"=>"Successful","3"=>"Failed");
 
+$sub_status_name = array(
+              "0"=>"UNSUBMITTED",
+              "1"=>"REGISTERED",
+              "2"=>"PENDING",
+              "3"=>"IDLE",
+              "4"=>"RUNNING",
+              "5"=>"REALLY-RUNNING",
+              "6"=>"HELD",
+              "7"=>"DONE-OK",
+              "8"=>"DONE-FAILED",
+              "9"=>"CANCELLED",
+             "10"=>"ABORTED",
+             "11"=>"UNKNOWN",
+             "12"=>"UNDEF",
+             "13"=>"REMOVING",
+             "14"=>"TRANSFERRING",
+             "15"=>"SUSPENDED",
+            "100"=>"SUBMIT-FAILED",
+            "107"=>"DONE-OK, output problem",
+            "108"=>"DONE-FAILED, output problem",
+            "109"=>"CANCELLED, output problem",
+            "207"=>"DONE_OK, RC!=0"
+);
+
 # Default call
 $qname = "";
 $qjobid = "";
@@ -455,6 +479,9 @@ function show_job($job_id) {
     # Import job status table
     global $job_status_name;
 
+    # Import submit status table
+    global $sub_status_name;
+
     // **************** Job page ******************* //
 
     # Get production information for this job
@@ -498,12 +525,90 @@ WHERE j.id = $job_id
     echo "<h2>Production ",$prod_name," Job ",$job_name,"</h2>\n";
 
     echo "<table cellpadding=3>\n";
-    echo "<tr><td>Status</td><td>$job_status_name[$job_status] ($job_status)</td></tr>\n";
-    echo "<tr><td>Job Started</td><td>",$job_time_created,"</td></tr>\n";
-    echo "<tr><td>Job Ended</td><td>",$job_time_complete,"</td></tr>\n";
-    echo "<tr><td>Files produced</td><td>",$job_n_files,"</td></tr>\n";
-    echo "<tr><td>Events processed</td><td>",$job_n_events,"</td></tr>\n";
+    echo "\t<tr><td>Status</td><td>$job_status_name[$job_status] ($job_status)</td></tr>\n";
+    echo "\t<tr><td>Job Started</td><td>",$job_time_create,"</td></tr>\n";
+    echo "\t<tr><td>Job Ended</td><td>",$job_time_complete,"</td></tr>\n";
+    echo "\t<tr><td>Files produced</td><td>",$job_n_files,"</td></tr>\n";
+    echo "\t<tr><td>Events processed</td><td>",$job_n_events,"</td></tr>\n";
+    echo "\t<tr><td>Job submissions</td><td>",$job_n_submit,"</td></tr>\n";
     echo "</table>\n";
 
+    # Get list of files
+    if ($job_n_files > 0) {
+        echo "<h3>Files produced</h3>\n";
+        echo "<table cellpadding=3>\n";
+        echo "\t<tr><td>Storage element URI</td><td>$storage_uri</td></tr>\n";
+        echo "\t<tr><td>Storage directory</td><td>$storage_dir</td></tr>\n";
+        echo "</table>\n";
+        echo "<table cellpadding=3>\n";
+        echo "\t<tr><th>Index</th><th>File name</th><th>Type</th><th>Events</th><th>Size</th><th>Checksum</th><th>Open</th><th>Close</th></tr>\n";
+        $query = "SELECT name,type,seq_index,time_open,time_close,n_events,size,adler32 FROM file WHERE job_id=$job_id";
+        $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
+        while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
+            $file_name = $line["name"];
+            $file_type = $line["type"];
+            $file_index = $line["seq_index"];
+            $file_open = $line["time_open"];
+            $file_close = $line["time_close"];
+            $file_events = $line["n_events"];
+            $file_size = $line["size"];
+            $file_chksm = $line["adler32"];
+            echo "\t<tr>\n";
+            echo "\t\t<td align=center>$file_index</td>\n";
+            echo "\t\t<td>$file_name</td>\n";
+            echo "\t\t<td>$file_type</td>\n";
+            echo "\t\t<td align=right>$file_events</td>\n";
+            echo "\t\t<td align=right>$file_size</td>\n";
+            echo "\t\t<td align=center>$file_chksm</td>\n";
+            echo "\t\t<td>$file_open</td>\n";
+            echo "\t\t<td>$file_close</td>\n";
+            echo "\t</tr>\n";
+        }
+        echo "</table>\n";
+        mysqli_free_result($result);
+    }
 
-} 
+    # Show list of submissions
+    echo "<h3>Submission history</h3>\n";
+    $query = "SELECT * FROM job_submit WHERE job_id=$job_id";
+    $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
+    if (mysqli_num_rows($result)==0) {
+        echo "<b>No job submission is available</b>\n";
+    } else {
+        echo "<table cellpadding=3>\n";
+        echo "\t<tr><th>Index</th><th>Status</th><th>Exit code</th><th>CE Job Id</th><th>Worker Node</th><th>VO User</th><th>Working dir</th><th>Submitted</th><th>Job Start</th><th>Run Start</th><th>Run End</th><th>Job End</th><th>Completed</th></tr>\n";
+        while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
+            $sub_index = $line["submit_index"];
+            $sub_status = $line["status"];
+            $sub_exit_code =  $line["exit_code"];
+            $sub_ce_job_id =  $line["ce_job_id"];
+            $sub_worker_node =  $line["worker_node"];
+            $sub_vo_user =  $line["wn_user"];
+            $sub_wn_dir =  $line["wn_dir"];
+            $sub_time_submit =  $line["time_submit"];
+            $sub_time_complete =  $line["time_complete"];
+            $sub_time_job_start =  $line["time_job_start"];
+            $sub_time_job_end =  $line["time_job_end"];
+            $sub_time_run_start=  $line["time_run_start"];
+            $sub_time_run_end =  $line["time_run_end"];
+            echo "\t<tr>\n";
+            echo "\t\t<td align=center>$sub_index</td>\n";
+            echo "\t\t<td>$sub_status_name[$sub_status] ($sub_status)</td>\n";
+            echo "\t\t<td align=center>$sub_exit_code</td>\n";
+            echo "\t\t<td>$sub_ce_job_id</td>\n";
+            echo "\t\t<td>$sub_worker_node</td>\n";
+            echo "\t\t<td>$sub_vo_user</td>\n";
+            echo "\t\t<td>$sub_wn_dir</td>\n";
+            echo "\t\t<td>$sub_time_submit</td>\n";
+            echo "\t\t<td>$sub_time_job_start</td>\n";
+            echo "\t\t<td>$sub_time_run_start</td>\n";
+            echo "\t\t<td>$sub_time_run_end</td>\n";
+            echo "\t\t<td>$sub_time_job_end</td>\n";
+            echo "\t\t<td>$sub_time_complete</td>\n";
+            echo "\t</tr>\n";
+        }
+        echo "</table>\n";
+        mysqli_free_result($result);
+    }
+
+}
