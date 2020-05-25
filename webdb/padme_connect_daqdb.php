@@ -1,7 +1,8 @@
 <?php
 
 # Get DB connection info from local file
-foreach( explode("\n",file_get_contents(".padme-dbaccess.sh")) as $data ) {
+foreach ( explode("\n",file_get_contents(".padme-dbaccess.sh")) as $data ) {
+    if ( preg_match("/^\s*#/",$data) == 1 ) continue;
     if ( preg_match("/export\s+(\S+)=(\S+)/",$data,$matches) == 1 )
         $dbaccess[$matches[1]] = $matches[2];
 }

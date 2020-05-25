@@ -166,7 +166,7 @@ if ( $qphysics == "ALL" ) {
 echo "\t\t</select>\n";
 
 echo "\t\t<input type=submit value=Submit>\n";
-echo "\t</fieldset>";
+echo "\t</fieldset>\n";
 echo "</form>\n";
 
 if ( $qname == "" ) {
