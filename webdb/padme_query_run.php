@@ -227,7 +227,8 @@ mysqli_close($mysqli);
 
     // Get list of existing Runs
     $query = "
-SELECT r.name         AS name,
+SELECT r.number       AS number,
+       r.name         AS name,
        rt.type        AS type,
        r.status       AS status,
        r.time_create  AS time_create,
@@ -238,6 +239,7 @@ FROM         run        r
 $where_clause
 ORDER BY r.time_create
 ";
+    #echo "<h2>",$query,"</h2>\n";
     $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
 
     if (mysqli_num_rows($result)==0) {
@@ -245,8 +247,9 @@ ORDER BY r.time_create
     } else {
         // Printing results in HTML
         echo "<table cellpadding=3>\n";
-        echo "\t<tr><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th></tr>\n";
+        echo "\t<tr><th>Run nr</th><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th></tr>\n";
         while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
+            $number = $line["number"];
             $name = $line["name"];
             $runstat = ((int)$line["status"]) % 100;
             $physics = floor(((int)$line["status"])/100);
@@ -256,6 +259,7 @@ ORDER BY r.time_create
             $total_events = $line["total_events"];
             if ($phys == "ALL" || ($phys == "GOOD" && $physics == 1)) {
                 echo "\t<tr>\n";
+                echo "\t\t<td align=center>$number</a></td>\n";
                 echo "\t\t<td><a href=\"",RUN_SCRIPT,"?name=$name\">$name</a></td>\n";
                 echo "\t\t<td align=center>$type</a></td>\n";
                 echo "\t\t<td align=center>$status[$runstat]</a></td>\n";
