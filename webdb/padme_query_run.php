@@ -335,10 +335,27 @@ WHERE r.name=\"$run_name\"
     $time_stop = $line["time_stop"];
     $total_events = $line["total_events"];
 
+    $query = "
+SELECT rcp.value AS para_value,
+       cpn.name  AS para_name
+FROM run_config_para rcp
+  INNER JOIN config_para_name cpn ON rcp.config_para_name_id=cpn.id
+WHERE rcp.run_number=$run_number AND ( cpn.name=\"setup\" OR cpn.name=\"board_list\" )
+";
+    $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
+    if (mysqli_num_rows($result)!=0) {
+        while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
+            if ($line["para_name"] == "setup") { $run_setup = $line["para_value"]; }
+            if ($line["para_name"] == "board_list") { $board_list = $line["para_value"]; }
+        }
+	}
+
     echo "<table cellpadding=3>\n";
     echo "<tr><td>Run number</td><td>",$run_number,"</td></tr>\n";
     echo "<tr><td>Run type</td><td>",$run_type,"</td></tr>\n";
     echo "<tr><td>User</td><td>",$user,"</td></tr>\n";
+    if ($run_setup) echo "<tr><td>Setup</td><td>",$run_setup,"</td></tr>\n";
+    if ($board_list) echo "<tr><td>Board list</td><td>",$board_list,"</td></tr>\n";
     echo "<tr><td>Run status</td><td>",$run_status,"</td></tr>\n";
     echo "<tr><td>Total events</td><td>",$total_events,"</td></tr>\n";
     echo "<tr><td>Time created</td><td>",$time_create,"</td></tr>\n";
