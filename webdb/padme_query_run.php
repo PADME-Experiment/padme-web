@@ -239,7 +239,7 @@ FROM         run        r
 $where_clause
 ORDER BY r.time_create
 ";
-    #echo "<h2>",$query,"</h2>\n";
+    //echo "<h2>",$query,"</h2>\n";
     $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
 
     if (mysqli_num_rows($result)==0) {
@@ -247,7 +247,7 @@ ORDER BY r.time_create
     } else {
         // Printing results in HTML
         echo "<table cellpadding=3>\n";
-        echo "\t<tr><th>Run nr</th><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th></tr>\n";
+        echo "\t<tr><th>Run nr</th><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th><th>Setup</th><th>Energy</th></tr>\n";
         while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
             $number = $line["number"];
             $name = $line["name"];
@@ -257,24 +257,51 @@ ORDER BY r.time_create
             $time_create = $line["time_create"];
             $time_stop = $line["time_stop"];
             $total_events = $line["total_events"];
+            // Get setup and energy
+            $run_setup = "";
+            $run_energy = "";
+            $query = "
+SELECT rcp.value AS para_value,
+       cpn.name  AS para_name
+FROM run_config_para rcp
+  INNER JOIN config_para_name cpn ON rcp.config_para_name_id=cpn.id
+WHERE rcp.run_number=$number AND ( cpn.name=\"setup\" OR cpn.name=\"dhstb01_e\" )
+";
+            $rr = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
+            if (mysqli_num_rows($rr)!=0) {
+                while ($ll = mysqli_fetch_array($rr,MYSQLI_ASSOC)) {
+                    if ($ll["para_name"] == "setup") { $run_setup = $ll["para_value"]; }
+                    if ($ll["para_name"] == "dhstb01_e") { $run_energy = $ll["para_value"]; }
+                }
+            }
             if ($phys == "ALL" || ($phys == "GOOD" && $physics == 1)) {
                 echo "\t<tr>\n";
-                echo "\t\t<td align=center>$number</a></td>\n";
+                echo "\t\t<td align=center>$number</td>\n";
                 echo "\t\t<td><a href=\"",RUN_SCRIPT,"?name=$name\">$name</a></td>\n";
-                echo "\t\t<td align=center>$type</a></td>\n";
-                echo "\t\t<td align=center>$status[$runstat]</a></td>\n";
+                echo "\t\t<td align=center>$type</td>\n";
+                echo "\t\t<td align=center>$status[$runstat]</td>\n";
                 if ($physics == 1) {
-                    echo "\t\t<td align=center>GOOD</a></td>\n";
+                    echo "\t\t<td align=center>GOOD</td>\n";
                 } else {
-                    echo "\t\t<td align=center>-</a></td>\n";
+                    echo "\t\t<td align=center>-</td>\n";
                 }
                 if (is_null($total_events)) {
-                    echo "\t\t<td align=right>-</a></td>\n";
+                    echo "\t\t<td align=right>-</td>\n";
                 } else {
-                    echo "\t\t<td align=right>$total_events</a></td>\n";
+                    echo "\t\t<td align=right>$total_events</td>\n";
                 }
-                echo "\t\t<td>$time_create</a></td>\n";
-                echo "\t\t<td>$time_stop</a></td>\n";
+                echo "\t\t<td>$time_create</td>\n";
+                echo "\t\t<td>$time_stop</td>\n";
+                if ($run_setup == "") {
+                    echo "\t\t<td>-</td>\n";
+                } else {
+                    echo "\t\t<td>$run_setup</td>\n";
+                }
+                if ($run_energy == "" || $run_energy == "0.000") {
+                    echo "\t\t<td>-</td>\n";
+                } else {
+                    echo "\t\t<td>$run_energy MeV</td>\n";
+                }
                 echo "\t</tr>\n";
             }
         }
@@ -335,18 +362,23 @@ WHERE r.name=\"$run_name\"
     $time_stop = $line["time_stop"];
     $total_events = $line["total_events"];
 
+    // Extract some parameters from run configuration
+    $run_setup = "";
+    $board_list = "";
+    $energy = "";
     $query = "
 SELECT rcp.value AS para_value,
        cpn.name  AS para_name
 FROM run_config_para rcp
   INNER JOIN config_para_name cpn ON rcp.config_para_name_id=cpn.id
-WHERE rcp.run_number=$run_number AND ( cpn.name=\"setup\" OR cpn.name=\"board_list\" )
+WHERE rcp.run_number=$run_number AND ( cpn.name=\"setup\" OR cpn.name=\"board_list\" OR cpn.name=\"dhstb01_e\" )
 ";
     $result = mysqli_query($mysqli,$query) or die('Query failed: '.mysqli_error($mysqli));
     if (mysqli_num_rows($result)!=0) {
         while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
             if ($line["para_name"] == "setup") { $run_setup = $line["para_value"]; }
             if ($line["para_name"] == "board_list") { $board_list = $line["para_value"]; }
+            if ($line["para_name"] == "dhstb01_e") { $energy = $line["para_value"]; }
         }
 	}
 
@@ -356,6 +388,7 @@ WHERE rcp.run_number=$run_number AND ( cpn.name=\"setup\" OR cpn.name=\"board_li
     echo "<tr><td>User</td><td>",$user,"</td></tr>\n";
     if ($run_setup) echo "<tr><td>Setup</td><td>",$run_setup,"</td></tr>\n";
     if ($board_list) echo "<tr><td>Board list</td><td>",$board_list,"</td></tr>\n";
+    if ($energy && $energy != "0.000") echo "<tr><td>Energy</td><td>",$energy," MeV</td></tr>\n";
     echo "<tr><td>Run status</td><td>",$run_status,"</td></tr>\n";
     echo "<tr><td>Total events</td><td>",$total_events,"</td></tr>\n";
     echo "<tr><td>Time created</td><td>",$time_create,"</td></tr>\n";
