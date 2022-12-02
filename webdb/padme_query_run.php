@@ -246,7 +246,7 @@ ORDER BY r.time_create
         echo "<h2>No run was started in the selected period</h2>\n";
     } else {
         // Printing results in HTML
-        echo "<table cellpadding=3>\n";
+        echo "<table cellpadding=5 border=1>\n";
         echo "\t<tr><th>Run nr</th><th>Run name</th><th>Type</th><th>Status</th><th>Physics</th><th>Events</th><th>Created</th><th>Ended</th><th>Setup</th><th>Energy</th></tr>\n";
         while ($line = mysqli_fetch_array($result,MYSQLI_ASSOC)) {
             $number = $line["number"];
